@@ -37,6 +37,7 @@ $
 で計算する。ただし始点は $(x_1, y_1)$ である。
 
 与えられた距離表から DP を行うと、累積距離表は @fig:dp1 のようになる。
+また、入力パターンと標準パターンの対応は @fig:pat1 のようになる。
 
 #figure(
   cetz.canvas(length: 1cm, {
@@ -80,8 +81,8 @@ $
     )
 
     // 軸
-    line((0.55, 0.55), (5.65, 0.55), stroke: 0.8pt)
-    line((0.55, 0.55), (0.55, 6.45), stroke: 0.8pt)
+    line((0.55, 0.55), (5.65, 0.55), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+    line((0.55, 0.55), (0.55, 6.45), stroke: 0.8pt, mark: (end: "stealth", fill: black))
 
     // 軸ラベル
     content((5.85, 0.42), text(size: 16pt)[$X$])
@@ -143,6 +144,40 @@ $
   caption: [課題①の DP 格子図],
 ) <fig:dp1>
 
+#figure(
+  cetz.canvas(length: 1cm, {
+    import cetz.draw: *
+
+    content((0, 2), text(size: 13pt)[$y_1$])
+    content((1, 2), text(size: 13pt)[$y_2$])
+    content((2, 2), text(size: 13pt)[$y_3$])
+    content((3, 2), text(size: 13pt)[$y_4$])
+    content((4, 2), text(size: 13pt)[$y_5$])
+    content((5, 2), text(size: 13pt)[$y_6$])
+
+    content((1, 0), text(size: 13pt)[$x_1$])
+    content((2, 0), text(size: 13pt)[$x_2$])
+    content((3, 0), text(size: 13pt)[$x_3$])
+    content((4, 0), text(size: 13pt)[$x_4$])
+
+    line((0, 2 - 0.3), (1 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+    line((0, 2 - 0.3), (2 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+
+    line((1, 2 - 0.3), (2 - 0.1, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+
+    line((2, 2 - 0.3), (2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+    line((2, 2 - 0.3), (3 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+
+    line((3, 2 - 0.3), (3, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+
+    line((4, 2 - 0.3), (3 + 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+    line((4, 2 - 0.3), (4, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+
+    line((5, 2 - 0.3), (4 + 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+  }),
+  caption: [課題①の入力パターンと標準パターンの対応],
+) <fig:pat1>
+
 最小経路、すなわち入力パターンと標準パターンの対応は次の通り。
 
 $
@@ -177,3 +212,52 @@ $
 単語列、入力パターンと標準パターンの対応、累積距離、正規化累積距離を求めよ
 
 === 解答
+
+標準パターンを
+
+$
+  A = { a, b, a }, space B = { b, c }
+$
+
+入力パターンを
+
+$
+  X = { a, b, b, c, b, c }
+$
+
+とする。候補となる単語列は、
+
+$
+  "AA", "AB", "BA", "BB"
+$
+
+である。
+
+距離尺度は問題文より、
+
+$
+  d(a, b) = d(b, a) = 2 \
+  d(a, c) = d(c, a) = 3 \
+  d(b, c) = d(c, b) = 1 \
+  d(a, a) = d(b, b) = d(c, c) = 0
+$
+
+である。
+
+また、本課題の制約条件では、入力フレームが $1$ つ進むごとに、標準パターン側では同じ状態にとどまるか、次の状態へ進む。
+したがって、累積距離 $G(i,j)$ は
+
+$
+  G(i, j) = d(x_i, y_i) + min{ G(i - 1, j), G(i - 1, j - 1) }
+$
+
+によって計算する。
+ただし、$x_i$ は入力パターン、$y_j$ は標準パターンを表す。
+
+#set enum(numbering: "a.")
+
++ 2段 DP 法
+
++ レベルベルディング法
+
++ ワンパス DP 法
