@@ -455,8 +455,619 @@ $
 
 + レベルベルディング法
 
-cetz error
+#let dx = 1.45
+#let dy = 1.15
+#let rad = 0.28
+
+#let p(origin, c, r) = (
+  origin.at(0) + c * dx,
+  origin.at(1) + r * dy,
+)
+
+#let draw-dashed-line(x1, y, x2) = {
+  import cetz.draw: *
+  let seg = 0.22
+  let gap = 0.14
+  let n = calc.floor((x2 - x1) / (seg + gap))
+  for k in range(n) {
+    let a = x1 + k * (seg + gap)
+    line((a, y), (a + seg, y), stroke: 0.6pt)
+  }
+}
+
+#let draw-arrow(origin, from, to, color: black, width: 0.8pt) = {
+  import cetz.draw: *
+  line(
+    p(origin, from.at(0), from.at(1)),
+    p(origin, to.at(0), to.at(1)),
+    stroke: width + color,
+    mark: (end: ">", fill: black),
+  )
+}
+
+#let draw-word-panel(
+  origin,
+  title,
+  word-name,
+  rowlabels,
+  costs,
+  cums,
+  arrows,
+  base: (),
+) = {
+  import cetz.draw: *
+
+  let ox = origin.at(0)
+  let oy = origin.at(1)
+  let rows = rowlabels.len()
+  let has-base = base.len() > 0
+
+  let axis-y = if has-base { oy - dy - 0.45 } else { oy - 0.45 }
+  let xlabels-y = axis-y - 0.42
+  let top-y = oy + (rows - 1) * dy + 0.55
+
+  // タイトル
+  content(
+    (ox + 2.5 * dx, top-y + 0.55),
+    text(size: 10pt)[#title],
+  )
+
+  // 軸
+  line((ox - 0.45, axis-y), (ox + 5 * dx + 0.45, axis-y), stroke: 0.8pt)
+  line((ox - 0.45, axis-y), (ox - 0.45, top-y), stroke: 0.8pt)
+
+  content((ox + 5 * dx + 0.70, axis-y), text(size: 13pt)[$X$])
+  content((ox - 0.40, top-y + 0.23), text(size: 13pt)[#word-name])
+
+  // x ラベル
+  let xlabels = ($x_1$, $x_2$, $x_3$, $x_4$, $x_5$, $x_6$)
+  for c in range(6) {
+    content((ox + c * dx, xlabels-y), text(size: 9pt)[#xlabels.at(c)])
+  }
+
+  // 行ラベル
+  for r in range(rows) {
+    content((ox - 0.95, oy + r * dy), text(size: 10pt)[#rowlabels.at(r)])
+  }
+
+  // レベル境界の破線
+  if has-base {
+    draw-dashed-line(ox - 0.35, oy - dy / 2, ox + 5 * dx + 0.35)
+  }
+
+  // 下段：前レベルのスコア
+  // base item = (col, label, value)
+  if has-base {
+    for item in base {
+      let c = item.at(0)
+      let lab = item.at(1)
+      let val = item.at(2)
+      let q = p(origin, c, -1)
+
+      circle(q, radius: rad, fill: white, stroke: 0.7pt)
+
+      if lab != "" {
+        content((q.at(0) - 0.45, q.at(1)), text(size: 10pt)[#lab])
+      }
+
+      if val != "" {
+        content(q, text(size: 10pt)[#val])
+      }
+    }
+  }
+
+  // 局所距離ノード
+  for r in range(rows) {
+    for c in range(6) {
+      let q = p(origin, c, r)
+      circle(q, radius: rad, fill: white, stroke: 0.7pt)
+      content(q, text(size: 10pt)[#costs.at(r).at(c)])
+    }
+  }
+
+  let vadd(a, b) = a.zip(b, exact: true).map(((x, y)) => x + y)
+
+  // 矢印
+  for edge in arrows {
+    if (edge.at(0).at(1) == edge.at(1).at(1)) {
+      draw-arrow(origin, vadd(edge.at(0), (0.2, 0)), vadd(edge.at(1), (-0.2, 0)))
+    } else {
+      draw-arrow(origin, vadd(edge.at(0), (0.2, 0.2)), vadd(edge.at(1), (-0.15, -0.15)))
+    }
+  }
+
+  // 累積距離
+  // cums item = (col, row, value)
+  for item in cums {
+    let c = item.at(0)
+    let r = item.at(1)
+    let val = item.at(2)
+    let q = p(origin, c, r)
+
+    content(
+      (q.at(0) + 0.30, q.at(1) + 0.34),
+      text(size: 9pt)[#val],
+    )
+  }
+}
+
+// 入力 X = a b b c b c
+// A = a b a
+// B = b c
+
+#let costs-a = (
+  (0, 2, 2, 3, 2, 3), // a₁
+  (2, 0, 0, 1, 0, 1), // a₂
+  (0, 2, 2, 3, 2, 3), // a₃
+)
+
+#let costs-b = (
+  (2, 0, 0, 1, 0, 1), // b₁
+  (3, 1, 1, 0, 1, 0), // b₂
+)
+
+// ------------------------------------------------------------
+// 第1レベル：入力の先頭から 1 単語を対応させる
+// ------------------------------------------------------------
+
+#figure(
+  cetz.canvas(length: 8mm, {
+    import cetz.draw: *
+
+    draw-word-panel(
+      (1.2, 5.8),
+      [第1レベル：単語 A],
+      $A$,
+      ($a_1$, $a_2$, $a_3$),
+      costs-a,
+      (
+        (0, 0, 0),
+        (1, 0, 2),
+        (2, 0, 4),
+        (3, 0, 7),
+        (4, 0, 9),
+        (5, 0, 12),
+        (1, 1, 0),
+        (2, 1, 0),
+        (3, 1, 1),
+        (4, 1, 1),
+        (5, 1, 2),
+        (2, 2, 2),
+        (3, 2, 3),
+        (4, 2, 3),
+        (5, 2, 4),
+      ),
+      (
+        ((0, 0), (1, 0)),
+        ((1, 0), (2, 0)),
+        ((2, 0), (3, 0)),
+        ((3, 0), (4, 0)),
+        ((4, 0), (5, 0)),
+        ((0, 0), (1, 1)),
+        ((1, 1), (2, 1)),
+        ((2, 1), (3, 1)),
+        ((3, 1), (4, 1)),
+        ((4, 1), (5, 1)),
+        ((1, 1), (2, 2)),
+        ((2, 1), (3, 2)),
+        ((3, 1), (4, 2)),
+        ((4, 1), (5, 2)),
+      ),
+    )
+
+    draw-word-panel(
+      (1.2, 1.5),
+      [第1レベル：単語 B],
+      $B$,
+      ($b_1$, $b_2$),
+      costs-b,
+      (
+        (0, 0, 2),
+        (1, 0, 2),
+        (2, 0, 2),
+        (3, 0, 3),
+        (4, 0, 3),
+        (5, 0, 4),
+        (1, 1, 3),
+        (2, 1, 3),
+        (3, 1, 2),
+        (4, 1, 3),
+        (5, 1, 3),
+      ),
+      (
+        ((0, 0), (1, 0)),
+        ((1, 0), (2, 0)),
+        ((2, 0), (3, 0)),
+        ((3, 0), (4, 0)),
+        ((4, 0), (5, 0)),
+        ((0, 0), (1, 1)),
+        ((1, 0), (2, 1)),
+        ((2, 0), (3, 1)),
+        ((3, 1), (4, 1)),
+        ((4, 1), (5, 1)),
+      ),
+    )
+  }),
+  caption: [レベルビルディング法：第1レベルの DP],
+)
+
+// ------------------------------------------------------------
+// 第2レベル：第1レベルの結果から 2 単語目を接続する
+// ------------------------------------------------------------
+
+#let base-level-1 = (
+  (0, "", ""),
+  (1, "B", "3"),
+  (2, "A", "2"),
+  (3, "B", "2"),
+  (4, "A/B", "3"),
+  (5, "B", "3"),
+)
+
+#figure(
+  cetz.canvas(length: 8mm, {
+    import cetz.draw: *
+
+    draw-word-panel(
+      (1.2, 6.5),
+      [第2レベル：単語 A を接続],
+      $A$,
+      ($a_1$, $a_2$, $a_3$),
+      costs-a,
+      (
+        (2, 0, 5),
+        (3, 0, 5),
+        (4, 0, 4),
+        (5, 0, 6),
+        (3, 1, 6),
+        (4, 1, 5),
+        (5, 1, 5),
+        (4, 2, 8),
+        (5, 2, 8),
+      ),
+      (
+        ((1, -1), (2, 0)),
+        ((2, -1), (3, 0)),
+        ((3, -1), (4, 0)),
+        ((4, -1), (5, 0)),
+        ((2, 0), (3, 1)),
+        ((3, 0), (4, 1)),
+        ((4, 0), (5, 1)),
+        ((3, 1), (4, 2)),
+        ((4, 1), (5, 2)),
+      ),
+      base: base-level-1,
+    )
+
+    draw-word-panel(
+      (1.2, 1.5),
+      [第2レベル：単語 B を接続],
+      $B$,
+      ($b_1$, $b_2$),
+      costs-b,
+      (
+        (2, 0, 3),
+        (3, 0, 3),
+        (4, 0, 2),
+        (5, 0, 3),
+        (3, 1, 3),
+        (4, 1, 4),
+        (5, 1, 2),
+      ),
+      (
+        ((1, -1), (2, 0)),
+        ((2, -1), (3, 0)),
+        ((3, -1), (4, 0)),
+        ((4, 0), (5, 0)),
+        ((2, 0), (3, 1)),
+        ((3, 1), (4, 1)),
+        ((4, 0), (5, 1)),
+      ),
+      base: base-level-1,
+    )
+  }),
+  caption: [レベルビルディング法：第2レベルの DP],
+)
+
+#figure(
+  cetz.canvas(length: 1cm, {
+    import cetz.draw: *
+
+    content((2, 2), text(size: 13pt)[$b$])
+    content((3, 2), text(size: 13pt)[$c$])
+    content((4, 2), text(size: 13pt)[$b$])
+    content((5, 2), text(size: 13pt)[$c$])
+
+    content((1, 0), text(size: 13pt)[$a$])
+    content((2, 0), text(size: 13pt)[$b$])
+    content((3, 0), text(size: 13pt)[$b$])
+    content((4, 0), text(size: 13pt)[$c$])
+    content((5, 0), text(size: 13pt)[$b$])
+    content((6, 0), text(size: 13pt)[$c$])
+
+    line((2, 2 - 0.3), (1 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+    line((2, 2 - 0.3), (2 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+    line((2, 2 - 0.3), (3 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+
+    line((3, 2 - 0.3), (4 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+
+    line((4, 2 - 0.3), (5 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+
+    line((5, 2 - 0.3), (6 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+  }),
+)
+
+よって、
+
+- 単語列：$"BB"$
+- 累積距離：$2$
+- 正規化累積距離：$2 / 6 = 1 / 3$
 
 + ワンパス DP 法
 
-cetz error
+#let dx = 1.45
+#let dy = 1.15
+#let rad = 0.28
+
+#let draw-onepass-panel(
+  origin,
+  title,
+  word-name,
+  rowlabels,
+  costs,
+  cums,
+  arrows,
+  base,
+) = {
+  import cetz.draw: *
+
+  let ox = origin.at(0)
+  let oy = origin.at(1)
+  let rows = rowlabels.len()
+
+  let axis-y = oy - dy - 0.45
+  let xlabels-y = axis-y - 0.42
+  let top-y = oy + (rows - 1) * dy + 0.55
+
+  // タイトル
+  content(
+    (ox + 2.6 * dx, top-y + 0.55),
+    text(size: 10pt)[#title],
+  )
+
+  // 軸
+  line((ox - 0.45, axis-y), (ox + 5 * dx + 0.45, axis-y), stroke: 0.8pt)
+  line((ox - 0.45, axis-y), (ox - 0.45, top-y), stroke: 0.8pt)
+
+  content((ox + 5 * dx + 0.70, axis-y), text(size: 13pt)[$X$])
+  content((ox - 0.40, top-y + 0.23), text(size: 13pt)[#word-name])
+
+  // x ラベル
+  let xlabels = ($x_1$, $x_2$, $x_3$, $x_4$, $x_5$, $x_6$)
+  for c in range(6) {
+    content((ox + c * dx, xlabels-y), text(size: 10pt)[#xlabels.at(c)])
+  }
+
+  // 行ラベル
+  for r in range(rows) {
+    content((ox - 0.95, oy + r * dy), text(size: 11pt)[#rowlabels.at(r)])
+  }
+
+  // 破線
+  draw-dashed-line(ox - 0.35, oy - dy / 2, ox + 5 * dx + 0.35)
+
+  // 下段（ワンパスの単語終端スコア）
+  // base item = (col, label, value)
+  for item in base {
+    let c = item.at(0)
+    let lab = item.at(1)
+    let val = item.at(2)
+    let q = p(origin, c, -1)
+
+    circle(q, radius: rad, fill: white, stroke: 0.7pt)
+
+    if lab != "" {
+      content((q.at(0) - 0.48, q.at(1)), text(size: 10pt)[#lab])
+    }
+
+    if val != "" {
+      content(q, text(size: 10pt)[#val])
+    }
+  }
+
+  // 局所距離ノード
+  for r in range(rows) {
+    for c in range(6) {
+      let q = p(origin, c, r)
+      circle(q, radius: rad, fill: white, stroke: 0.7pt)
+      content(q, text(size: 10pt)[#costs.at(r).at(c)])
+    }
+  }
+
+  // 矢印
+  let vadd(a, b) = a.zip(b, exact: true).map(((x, y)) => x + y)
+
+  // 矢印
+  for edge in arrows {
+    if (edge.at(0).at(1) == edge.at(1).at(1)) {
+      draw-arrow(origin, vadd(edge.at(0), (0.2, 0)), vadd(edge.at(1), (-0.2, 0)))
+    } else {
+      draw-arrow(origin, vadd(edge.at(0), (0.2, 0.2)), vadd(edge.at(1), (-0.15, -0.15)))
+    }
+  }
+
+  // 累積距離
+  // cums item = (col, row, value)
+  for item in cums {
+    let c = item.at(0)
+    let r = item.at(1)
+    let val = item.at(2)
+    let q = p(origin, c, r)
+
+    content(
+      (q.at(0) + 0.30, q.at(1) + 0.34),
+      text(size: 9pt)[#val],
+    )
+  }
+}
+
+// ------------------------------------------------------------
+// 入力 X = a b b c b c
+// A = a b a
+// B = b c
+// ------------------------------------------------------------
+
+#let costs-a = (
+  (0, 2, 2, 3, 2, 3), // a₁
+  (2, 0, 0, 1, 0, 1), // a₂
+  (0, 2, 2, 3, 2, 3), // a₃
+)
+
+#let costs-b = (
+  (2, 0, 0, 1, 0, 1), // b₁
+  (3, 1, 1, 0, 1, 0), // b₂
+)
+
+// 下段のワンパス終端スコア
+// x1: 完結単語なし
+// x2: B で 3
+// x3: A で 2
+// x4: B で 2
+// x5: A/B で 3（同値）
+// x6: B で 2
+#let base-row = (
+  (0, "", ""),
+  (1, "B", "3"),
+  (2, "A", "2"),
+  (3, "B", "2"),
+  (4, "A/B", "3"),
+  (5, "B", "2"),
+)
+
+#figure(
+  cetz.canvas(length: 8mm, {
+    import cetz.draw: *
+
+    // --------------------------------------------------------
+    // 上: 単語 A
+    // --------------------------------------------------------
+    draw-onepass-panel(
+      (1.2, 6.6),
+      [ワンパスDP法：単語 A],
+      $A$,
+      ($a_1$, $a_2$, $a_3$),
+      costs-a,
+      (
+        (0, 0, "0"),
+        (1, 0, "2"),
+        (2, 0, "4"),
+        (3, 0, "5"),
+        (4, 0, "4"),
+        (5, 0, "6"),
+        (1, 1, "0"),
+        (2, 1, "0"),
+        (3, 1, "1"),
+        (4, 1, "1"),
+        (5, 1, "2"),
+        (2, 2, "2"),
+        (3, 2, "3"),
+        (4, 2, "3"),
+        (5, 2, "4"),
+      ),
+      (
+        // a1
+        ((0, 0), (1, 0)),
+        ((1, 0), (2, 0)),
+        ((2, -1), (3, 0)),
+        ((3, -1), (4, 0)),
+        ((4, -1), (5, 0)),
+        // a2
+        ((0, 0), (1, 1)),
+        ((1, 1), (2, 1)),
+        ((2, 1), (3, 1)),
+        ((3, 1), (4, 1)),
+        ((4, 1), (5, 1)),
+        // a3
+        ((1, 1), (2, 2)),
+        ((2, 1), (3, 2)),
+        ((3, 1), (4, 2)),
+        ((4, 1), (5, 2)),
+      ),
+      base-row,
+    )
+
+    // --------------------------------------------------------
+    // 下: 単語 B
+    // --------------------------------------------------------
+    draw-onepass-panel(
+      (1.2, 1.4),
+      [ワンパスDP法：単語 B],
+      $B$,
+      ($b_1$, $b_2$),
+      costs-b,
+      (
+        (0, 0, "2"),
+        (1, 0, "2"),
+        (2, 0, "2"),
+        (3, 0, "3"),
+        (4, 0, "2"),
+        (5, 0, "3"),
+        (1, 1, "3"),
+        (2, 1, "3"),
+        (3, 1, "2"),
+        (4, 1, "3"),
+        (5, 1, "2"),
+      ),
+      (
+        // b1
+        ((0, 0), (1, 0)),
+        ((1, 0), (2, 0)),
+        ((2, -1), (3, 0)),
+        ((3, -1), (4, 0)),
+        ((4, 0), (5, 0)),
+        // b2
+        ((0, 0), (1, 1)),
+        ((1, 0), (2, 1)),
+        ((2, 0), (3, 1)),
+        ((3, 1), (4, 1)),
+        ((4, 0), (5, 1)),
+      ),
+      base-row,
+    )
+  }),
+  caption: [ワンパスDP法の図],
+)
+
+#figure(
+  cetz.canvas(length: 1cm, {
+    import cetz.draw: *
+
+    content((2, 2), text(size: 13pt)[$b$])
+    content((3, 2), text(size: 13pt)[$c$])
+    content((4, 2), text(size: 13pt)[$b$])
+    content((5, 2), text(size: 13pt)[$c$])
+
+    content((1, 0), text(size: 13pt)[$a$])
+    content((2, 0), text(size: 13pt)[$b$])
+    content((3, 0), text(size: 13pt)[$b$])
+    content((4, 0), text(size: 13pt)[$c$])
+    content((5, 0), text(size: 13pt)[$b$])
+    content((6, 0), text(size: 13pt)[$c$])
+
+    line((2, 2 - 0.3), (1 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+    line((2, 2 - 0.3), (2 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+    line((2, 2 - 0.3), (3 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+
+    line((3, 2 - 0.3), (4 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+
+    line((4, 2 - 0.3), (5 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+
+    line((5, 2 - 0.3), (6 - 0.2, 0 + 0.2), stroke: 0.8pt, mark: (end: "stealth", fill: black))
+  }),
+)
+
+よって、
+
+- 単語列：$"BB"$
+- 累積距離：$2$
+- 正規化累積距離：$2 / 6 = 1 / 3$
