@@ -19,6 +19,8 @@
   row-label-x: -1.25,
   header-gap: 0.85,
   stroke-style: black + 0.8pt,
+  highlight-text-color: red,
+  highlight-stroke-style: red + 1.4pt,
 ) = {
   assert.eq(data.heads.len(), data.nodes.len())
 
@@ -27,6 +29,22 @@
 
   for col in data.nodes {
     assert.eq(col.len(), nrows)
+  }
+
+  let highlight = data.at(
+    "highlight",
+    default: (nodes: (), edges: ()),
+  )
+
+  let highlight-nodes = highlight.at("nodes", default: ())
+  let highlight-edges = highlight.at("edges", default: ())
+
+  let is-highlight-node(c, r) = {
+    highlight-nodes.contains((c, r))
+  }
+
+  let is-highlight-edge(c, r, dir) = {
+    highlight-edges.contains((c, r, dir))
   }
 
   cetz.canvas(length: length, {
@@ -79,7 +97,7 @@
       }
     }
 
-    let draw-node(pos, body: none) = {
+    let draw-node(pos, body: none, highlight: false) = {
       let p = center(pos)
       let px = p.at(0)
       let py = p.at(1)
@@ -87,13 +105,13 @@
       rect(
         (px - bw / 2, py - bh / 2),
         (px + bw / 2, py + bh / 2),
-        stroke: stroke-style,
+        stroke: if highlight { highlight-stroke-style } else { stroke-style },
       )
 
       if body != none {
         content(
           p,
-          text(size: value-size, body),
+          text(size: value-size, body, fill: if highlight { highlight-text-color } else { black }),
         )
       }
     }
@@ -107,6 +125,7 @@
       along: 0.5,
       from-dy: 0.0,
       to-dy: 0.0,
+      highlight: false,
     ) = {
       let a = port(from, "right", dy: from-dy)
       let b = port(to, "left", dy: to-dy)
@@ -114,7 +133,7 @@
       line(
         a,
         b,
-        stroke: stroke-style,
+        stroke: if highlight { highlight-stroke-style } else { stroke-style },
         mark: (end: ">", fill: black),
       )
 
@@ -124,17 +143,22 @@
       )
     }
 
-    // 行ラベル
+    // row labels
     for r in range(nrows) {
-      content(
-        (row-label-x, y(r)),
-        text(size: state-size, data.states.at(r)),
-      )
+      let label = data.states.at(r)
+
+      if label != none {
+        content(
+          (row-label-x, y(r)),
+          text(size: state-size, label),
+        )
+      }
     }
 
-    // 列ラベル
+    // column labels
     for c in range(ncols) {
       let head = data.heads.at(c)
+
       if head != none {
         content(
           (x(c), header-y),
@@ -143,15 +167,17 @@
       }
     }
 
-    // 矢印
+    // links
     for c in range(ncols) {
       for r in range(nrows) {
         let node = node-at(c, r)
+
         let right = node.to.at(0)
         let down = node.to.at(1)
 
         if right != none and c + 1 < ncols {
           let side = if 2 * r < nrows { 1 } else { -1 }
+
           draw-link(
             (c, r),
             (c + 1, r),
@@ -159,6 +185,7 @@
             side: side,
             offset: 0.28,
             along: 0.5,
+            highlight: is-highlight-edge(c, r, "right"),
           )
         }
 
@@ -172,16 +199,22 @@
             along: 0.55,
             from-dy: -0.10,
             to-dy: 0.05,
+            highlight: is-highlight-edge(c, r, "down"),
           )
         }
       }
     }
 
-    // ノード本体
+    // nodes
     for c in range(ncols) {
       for r in range(nrows) {
         let node = node-at(c, r)
-        draw-node((c, r), body: node.label)
+
+        draw-node(
+          (c, r),
+          body: node.label,
+          highlight: is-highlight-node(c, r),
+        )
       }
     }
   })

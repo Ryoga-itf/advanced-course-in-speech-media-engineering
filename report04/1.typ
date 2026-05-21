@@ -67,3 +67,5 @@
   draw-prob-graph(data-backward),
   caption: [バックワードアルゴリズムによる導出],
 )
+
+以上より、求める確率は $0.088$
